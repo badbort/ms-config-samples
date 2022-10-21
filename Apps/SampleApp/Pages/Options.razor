@@ -1,0 +1,118 @@
+﻿@page "/Options"
+@using SampleApp.Config
+@using Microsoft.Extensions.Options
+@using System.Text
+@implements IDisposable
+
+<h3>Microsoft.Extensions.Options</h3>
+
+@if (Notifications.Count > 0)
+{
+    <h2>Notifications</h2>
+    <button onclick="@(() => Notifications.Clear())">Clear</button>
+
+    foreach (var m in Notifications)
+    {
+        <p>@m</p>
+    }
+}
+
+<br/>
+<h3>IOptions</h3>
+@{
+    <p>
+        Does not support:
+        Reading of configuration data after the app has started.
+    </p>
+    <textarea>@(RenderSampleSettings(() => SampleOptions.Value))</textarea>
+}
+
+<br/>
+<h3>IOptionsSnapshot</h3>
+@{
+    <p>Is useful in scenarios where options should be recomputed on every request. For more information, see Use IOptionsSnapshot to read updated data.</p>
+    <textarea>@(RenderSampleSettings(() => SampleOptionsSnapshot.Value))</textarea>
+}
+
+<br/>
+<h3>IOptionsMonitor</h3>
+@{
+    <p>
+        Is used to retrieve options and manage options notifications for TOptions instances.
+        Is registered as a Singleton and can be injected into any service lifetime.
+    </p>
+    <textarea>@(RenderSampleSettings(() => SampleOptionsMonitor.CurrentValue))</textarea>
+}
+
+<style>
+    textarea {
+      width: 100%;
+      height: 150px;
+      padding: 12px 20px;
+      box-sizing: border-box;
+      border: 2px solid #ccc;
+      border-radius: 4px;
+      background-color: #f8f8f8;
+      font-size: 16px;
+      resize: none;
+    }
+</style>
+
+@code {
+    private IDisposable _subscription;
+    
+    [Inject]
+    protected IOptions<SampleSettings> SampleOptions { get; set; }
+
+    [Inject]
+    protected IOptionsSnapshot<SampleSettings> SampleOptionsSnapshot { get; set; }
+
+    [Inject]
+    protected IOptionsMonitor<SampleSettings> SampleOptionsMonitor { get; set; }
+
+    private List<string> Notifications { get; } = new();
+
+    protected override void OnInitialized()
+    {
+        _subscription = SampleOptionsMonitor.OnChange(_ =>
+        {
+            Notifications.Add($"Options monitor changed {DateTime.Now:T}");
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+    }
+
+    private string RenderSampleSettings(Func<SampleSettings> getSettings)
+    {
+        try
+        {
+            StringBuilder sb = new();
+            
+            var value = getSettings();
+            sb.AppendLine(value.ToString());
+
+            if (value.Thoughts?.Count > 0)
+            {
+                sb.AppendLine($"Thoughts: {value.Thoughts.Count}");
+                value.Thoughts?.ForEach(thought => sb.AppendLine($"\t{thought}"));
+            }
+            
+            if (value.Extensions?.Count > 0)
+            {
+                foreach (var (key, s) in value.Extensions)
+                    sb.AppendLine($"{key} = {s}");
+            }
+            
+            return sb.ToString();
+        }
+        catch (Exception e)
+        {
+            return $"{e.GetType().Name}: {e.Message}";
+        }
+    }
+
+    public void Dispose() => _subscription?.Dispose();
+}

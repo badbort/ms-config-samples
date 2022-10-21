@@ -1,0 +1,108 @@
+﻿@page "/IConfiguration"
+@using Microsoft.Extensions.Options
+@using SampleApp.Config
+@using System.Text
+@using Microsoft.Extensions.Primitives
+
+@if (Notifications.Count > 0)
+{
+    <h2>Notifications</h2>
+    <button onclick="@(() => Notifications.Clear())">Clear</button>
+
+    foreach (var m in Notifications)
+    {
+        <p>@m</p>
+    }
+}
+
+<h3>Configuration</h3>
+<details>
+  <summary>
+    Lists all configuration keys from the root configuration
+    <span class="icon">👇</span>
+  </summary>
+  @foreach (var (key, value) in Config.AsEnumerable())
+  {
+      var line = $"{key} = {value}";
+      <p>@line</p>
+  }
+</details>
+
+<h3>Providers</h3>
+<details>
+  <summary>
+    Configuration providers/sources
+    <span class="icon">👇</span>
+  </summary>ChainedConfigurationProvider
+    
+  @foreach (var (provider, index) in ConfigRoot.Providers.Select((p,i) => (Provider: p, Index: i)))
+  {
+      <p>@($"#{index} - {provider}")</p>
+  }
+</details>
+
+
+<h3>IConfigurationRoot.GetDebugView()</h3>
+<button @onclick="UpdateDebugString">Update</button>
+
+@if (!string.IsNullOrEmpty(Details))
+{
+    <div><textarea style="height: 250px">@Details</textarea></div>
+}
+
+@code {
+
+    [Inject]
+    protected IConfiguration Config { get; set; }
+
+    private List<string> Notifications { get; } = new();
+
+    private IConfigurationRoot ConfigRoot => (IConfigurationRoot)Config;
+
+    private string Details { get; set; }
+
+    private void UpdateDebugString() => Details = ConfigRoot.GetDebugView();
+
+    protected override void OnInitialized()
+    {
+        // Respond to configuration changes
+        ChangeToken.OnChange(() => Config.GetReloadToken(), OnConfigChanged);
+        
+        ChangeToken.OnChange(() => Config.GetSection(SampleSettings.ConfigKey).GetReloadToken(), OnSampleSectionChanged);
+    }
+
+    private void OnSampleSectionChanged()
+    {
+        Notifications.Add($"Config section {SampleSettings.ConfigKey} has changed! {DateTime.Now:T}");
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnConfigChanged()
+    {
+        Notifications.Add($"Root Configuration has changed! {DateTime.Now:T}");
+        InvokeAsync(StateHasChanged);
+    }
+
+    protected override void OnParametersSet()
+    {
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+    }
+
+}
+
+<style>
+    textarea {
+      width: 100%;
+      height: 150px;
+      padding: 12px 20px;
+      box-sizing: border-box;
+      border: 2px solid #ccc;
+      border-radius: 4px;
+      background-color: #f8f8f8;
+      font-size: 16px;
+      resize: none;
+    }
+</style>
